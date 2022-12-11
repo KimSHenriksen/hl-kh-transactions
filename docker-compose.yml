@@ -1,0 +1,15 @@
+version: "3.8"
+services:
+  mysqldb:
+    image: mysql:5.7
+    container_name: mysql-container      
+    env_file: ./.env
+    environment:
+      - MYSQL_ROOT_PASSWORD=$DB_PASSWORD
+      - MYSQL_DATABASE=$DB_NAME
+    ports:
+      - 3306:3306
+    volumes:
+      - ./static/transaction.sql:/docker-entrypoint-initdb.d/dump.sql
+
+
