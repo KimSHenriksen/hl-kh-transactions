@@ -1,24 +1,12 @@
 import {v4 as uuidv4} from 'uuid'
 import express, {Request, Response, Router} from 'express'
-import { Op } from 'sequelize'
+import sequelize, { Op } from 'sequelize'
 
 import connection, { Transaction, PaymentNote } from '../db'
 
 export const paymentNoteRoute: Router = express.Router()
 
 type PaymentNoteHandlerRequest = Request<{}, {}, {}, { period_from_datetime : string, period_to_datetime : string}>
-
-/**
- * Return sum of transaction_values
- * 
- * @param transactions list of transactions with transaction_value attributes
- * @returns sum over transaction_value in transactions
- */
-async function sumTransactionValues (transactions: Transaction[]): Promise<number> {
-    return transactions.reduce((accumulator, object) => {
-        return accumulator + object.transaction_value
-    }, 0)
-}
 
 /**
  * Update transactions with paymentNote and update paymentNote with sum and count over transactions.
@@ -28,30 +16,30 @@ async function sumTransactionValues (transactions: Transaction[]): Promise<numbe
  */
 async function completePaymentNoteTransaction (paymentNote: PaymentNote): Promise<void> { 
     try {
-        const _result = await connection.transaction( async (t) => {
-            const {rows, count}: {rows: Transaction[], count: number} = await Transaction.findAndCountAll({
-                where: {
-                    transaction_datetime: {
-                        [Op.gte]: paymentNote.payment_note_period_from_datetime,
-                        [Op.lte]: paymentNote.payment_note_period_to_datetime,
-                    },
-                    transaction_status_code: 'PENDING'
-                }
+        const filter = {
+            transaction_datetime: {
+                [Op.gte]: paymentNote.payment_note_period_from_datetime,
+                [Op.lte]: paymentNote.payment_note_period_to_datetime,
+            },
+            transaction_status_code: 'PENDING'
+        }
+        const _result = await connection.transaction( async (t) => { 
+            const valueSum = await Transaction.findOne({
+                attributes: [[sequelize.fn('SUM', sequelize.col('transaction_value')), 'valueSum']],
+                where: filter,
+                transaction: t
             })
 
-            await Transaction.update({
-                    transaction_status_code: 'PAID',
-                    transaction_payment_note_uuid: paymentNote.payment_note_uuid,
-                }, {
-                    where: {
-                        transaction_uuid: {
-                            [Op.in]: rows.map((x) => x.transaction_uuid)
-                        }
-                    }
+            const rowsAffected = await Transaction.update({
+                transaction_status_code: 'PAID',
+                transaction_payment_note_uuid: paymentNote.payment_note_uuid,
+            }, {
+                where: filter,
+                transaction: t
             })
 
-            paymentNote.payment_note_transactions_count = count
-            paymentNote.payment_note_value = await sumTransactionValues(rows)
+            paymentNote.payment_note_transactions_count = rowsAffected[0]
+            paymentNote.payment_note_value = valueSum?.dataValues.valueSum || 0
             paymentNote.payment_note_status_code = 'COMPLETED'
             await paymentNote.save()
         })

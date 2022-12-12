@@ -18,7 +18,6 @@ export class PaymentNote extends Model {
       @Column({
         type: DataTypes.DATE,
       })
-
       public payment_note_period_to_datetime!: Date
 
       @Column({
@@ -26,7 +25,6 @@ export class PaymentNote extends Model {
         allowNull: false
       })
       public payment_note_created_datetime!: Date
-
 
       @Column({
         type: DataTypes.INTEGER,
