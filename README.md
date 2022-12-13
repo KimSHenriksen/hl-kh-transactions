@@ -22,6 +22,6 @@ Node version in `.nvmrc`
 
     `curl localhost:3000/payment_note/PAYMENT_UUID`
 
-Table definition for payment_note shown in `payment_note.sql`. Table is created automatically if not alread in database.
+Table definition for payment_note shown in `payment_note.sql`. Table is created automatically if not already in database.
 
 
